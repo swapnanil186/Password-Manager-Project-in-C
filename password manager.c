@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define MAX_ACCOUNTS 100
 #define MAX_USERNAME_LENGTH 50
@@ -30,13 +31,12 @@ void xorCrypt(char *input, size_t length) {
 // Function to save accounts to a file
 void saveAccountsToFile() {
     FILE *file = fopen("passwords.dat", "wb");
-    if (file != NULL) {
-        fwrite(accounts, sizeof(struct Account), numAccounts, file);
-        fclose(file);
-    } else {
-        printf("Error saving accounts to file.\n");
-        exit(1);
+    if (file == NULL) {
+        perror("Error saving accounts to file");
+        exit(EXIT_FAILURE);
     }
+    fwrite(accounts, sizeof(struct Account), numAccounts, file);
+    fclose(file);
 }
 
 // Function to load accounts from a file
@@ -51,17 +51,23 @@ void loadAccountsFromFile() {
 // Function to set the master password
 void setMasterPassword() {
     printf("Set your master password: ");
-    scanf("%s", masterPassword);
+    if (scanf("%49s", masterPassword) != 1) {
+        fprintf(stderr, "Error reading master password\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Encrypt the master password
     xorCrypt(masterPassword, strlen(masterPassword));
 }
 
 // Function to check if the entered master password is correct
-int checkMasterPassword() {
+bool checkMasterPassword() {
     printf("Enter Master Password: ");
     char enteredPassword[MAX_PASSWORD_LENGTH];
-    scanf("%s", enteredPassword);
+    if (scanf("%49s", enteredPassword) != 1) {
+        fprintf(stderr, "Error reading master password\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Encrypt the entered master password for comparison
     xorCrypt(enteredPassword, strlen(enteredPassword));
@@ -77,16 +83,10 @@ void authenticate() {
         setMasterPassword();
     }
 
-    int authenticated = 0;
-
-    while (!authenticated) {
-        if (checkMasterPassword()) {
-            printf("Authentication successful!\n");
-            authenticated = 1;
-        } else {
-            printf("Incorrect master password. Please try again.\n");
-        }
+    while (!checkMasterPassword()) {
+        printf("Incorrect master password. Please try again.\n");
     }
+    printf("Authentication successful!\n");
 }
 
 void displayMenu() {
@@ -114,20 +114,37 @@ void passwordStrengthIndicator(const char *password) {
 }
 
 void addAccount() {
+    if (numAccounts >= MAX_ACCOUNTS) {
+        printf("Cannot add more accounts. Maximum limit reached.\n");
+        return;
+    }
+
     struct Account newAccount;
 
     printf("Enter Username: ");
-    scanf("%s", newAccount.username);
+    if (scanf("%49s", newAccount.username) != 1) {
+        fprintf(stderr, "Error reading username\n");
+        return;
+    }
 
     printf("Enter Password: ");
-    scanf("%s", newAccount.password);
+    if (scanf("%49s", newAccount.password) != 1) {
+        fprintf(stderr, "Error reading password\n");
+        return;
+    }
     xorCrypt(newAccount.password, strlen(newAccount.password));
 
     printf("Enter Website: ");
-    scanf("%s", newAccount.website);
+    if (scanf("%49s", newAccount.website) != 1) {
+        fprintf(stderr, "Error reading website\n");
+        return;
+    }
 
     printf("Enter Notes: ");
-    scanf("%s", newAccount.notes);
+    if (scanf("%99s", newAccount.notes) != 1) {
+        fprintf(stderr, "Error reading notes\n");
+        return;
+    }
 
     passwordStrengthIndicator(newAccount.password);
 
@@ -140,55 +157,57 @@ void addAccount() {
 void retrievePassword() {
     char searchUsername[MAX_USERNAME_LENGTH];
     printf("Enter Username for the account: ");
-    scanf("%s", searchUsername);
+    if (scanf("%49s", searchUsername) != 1) {
+        fprintf(stderr, "Error reading username\n");
+        return;
+    }
 
-    int found = 0;
     for (int i = 0; i < numAccounts; i++) {
         if (strcmp(accounts[i].username, searchUsername) == 0) {
             // Decrypt the password before displaying it
             xorCrypt(accounts[i].password, strlen(accounts[i].password));
-
             printf("Password: %s\n", accounts[i].password);
-            found = 1;
-            break;
+            return;
         }
     }
 
-    if (!found) {
-        printf("Account not found.\n");
-    }
+    printf("Account not found.\n");
 }
 
 void updateAccount() {
     char updateUsername[MAX_USERNAME_LENGTH];
     printf("Enter Username for the account to update: ");
-    scanf("%s", updateUsername);
+    if (scanf("%49s", updateUsername) != 1) {
+        fprintf(stderr, "Error reading username\n");
+        return;
+    }
 
-    int found = 0;
     for (int i = 0; i < numAccounts; i++) {
         if (strcmp(accounts[i].username, updateUsername) == 0) {
             printf("Enter new Password: ");
-            scanf("%s", accounts[i].password);
+            if (scanf("%49s", accounts[i].password) != 1) {
+                fprintf(stderr, "Error reading password\n");
+                return;
+            }
             xorCrypt(accounts[i].password, strlen(accounts[i].password));
 
             printf("Account updated successfully!\n");
             saveAccountsToFile();
-            found = 1;
-            break;
+            return;
         }
     }
 
-    if (!found) {
-        printf("Account not found.\n");
-    }
+    printf("Account not found.\n");
 }
 
 void deleteAccount() {
     char deleteUsername[MAX_USERNAME_LENGTH];
     printf("Enter Username for the account to delete: ");
-    scanf("%s", deleteUsername);
+    if (scanf("%49s", deleteUsername) != 1) {
+        fprintf(stderr, "Error reading username\n");
+        return;
+    }
 
-    int found = 0;
     for (int i = 0; i < numAccounts; i++) {
         if (strcmp(accounts[i].username, deleteUsername) == 0) {
             // Shift accounts to remove the deleted account
@@ -200,62 +219,65 @@ void deleteAccount() {
 
             printf("Account deleted successfully!\n");
             saveAccountsToFile();
-            found = 1;
-                  }
-              }
+            return;
+        }
+    }
 
-              if (!found) {
-                  printf("Account not found.\n");
-              }
-          }
+    printf("Account not found.\n");
+}
 
-          void displayAllAccounts() {
-              if (numAccounts > 0) {
-                  printf("\nAll Accounts:\n");
-                  for (int i = 0; i < numAccounts; i++) {
-                      printf("Username: %s\n", accounts[i].username);
-                      printf("Password: %s\n", accounts[i].password); // Passwords are decrypted for display
-                      printf("Website: %s\n", accounts[i].website);
-                      printf("Notes: %s\n", accounts[i].notes);
-                      printf("------------------------\n");
-                  }
-              } else {
-                  printf("No accounts to display.\n");
-              }
-          }
+void displayAllAccounts() {
+    if (numAccounts > 0) {
+        printf("\nAll Accounts:\n");
+        for (int i = 0; i < numAccounts; i++) {
+            printf("Username: %s\n", accounts[i].username);
+            printf("Password: %s\n", accounts[i].password); // Passwords are decrypted for display
+            printf("Website: %s\n", accounts[i].website);
+            printf("Notes: %s\n", accounts[i].notes);
+            printf("------------------------\n");
+        }
+    } else {
+        printf("No accounts to display.\n");
+    }
+}
 
-          int main() {
-              loadAccountsFromFile();
+int main() {
+    loadAccountsFromFile();
 
-              authenticate();
+    authenticate();
 
-              int choice;
-              do {
-                  displayMenu();
-                  printf("Enter your choice (1-6): ");
-                  scanf("%d", &choice);
+    int choice;
+    do {
+        displayMenu();
+        printf("Enter your choice (1-6): ");
+        if (scanf("%d", &choice) != 1) {
+            fprintf(stderr, "Error reading choice\n");
+            return EXIT_FAILURE;
+        }
 
-                  switch (choice) {
-                      case 1:
-                          addAccount();
-                          break;
-                      case 2:
-                          retrievePassword();
-                          break;
-                      case 3:
-                          updateAccount();
-                          break;
-                      case 4:
-                          deleteAccount();
-                          break;
-                      case 5:
-                          displayAllAccounts();
-                          break;
-                  }
-              } while (choice != 6);
+        switch (choice) {
+            case 1:
+                addAccount();
+                break;
+            case 2:
+                retrievePassword();
+                break;
+            case 3:
+                updateAccount();
+                break;
+            case 4:
+                deleteAccount();
+                break;
+            case 5:
+                displayAllAccounts();
+                break;
+            case 6:
+                printf("Exiting the Password Manager. Goodbye!\n");
+                break;
+            default:
+                printf("Invalid choice. Please enter a number between 1 and 6.\n");
+        }
+    } while (choice != 6);
 
-              printf("Exiting the Password Manager. Goodbye!\n");
-
-              return 0;
-          }
-
+    return EXIT_SUCCESS;
+}
